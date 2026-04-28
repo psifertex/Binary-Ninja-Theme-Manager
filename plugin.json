@@ -1,0 +1,39 @@
+{
+  "pluginmetadataversion": 2,
+  "name": "Theme Manager",
+  "type": [
+    "ui",
+    "helper"
+  ],
+  "api": [
+    "python3"
+  ],
+  "description": "Download and manage themes from different repos.",
+  "longdescription": "# A Theme Manager For Binary Ninja\n\n> Developped for Binary Ninja 3.5\n\nA simple plugin for browsing, installing, and applying community `.bntheme` themes inside Binary Ninja.\n\n## What it does\n\n- Lists themes from configured GitHub repositories\n- Shows installed themes locally\n- Lets you apply a theme directly from the UI\n- Basic search/filter for theme names\n\n## Storage\n\nInstalled themes are saved to:\n\n```\n~/.binaryninja/community-themes/\n```\n\n## Usage\n\nOpen:\n\n```\nPlugins → Theme Manager\n```\n\nThen:\n- Click **Install** to download a theme\n- Click **Set** to apply it (may need restart)\n\n## Supported repos\n\n- Vector35 - community themes  \n  https://github.com/Vector35/community-themes\n\n- Catppuccin - Binary Ninja themes  \n  https://github.com/catppuccin/binary-ninja/tree/main/themes\n\n- Dracula - Binary Ninja theme  \n  https://github.com/dracula/binary-ninja\n\n- Evan Richter - Base16 Binary Ninja colors  \n  https://github.com/evanrichter/base16-binary-ninja\n\n- FuzzySecurity - Binary Ninja themes  \n  https://github.com/FuzzySecurity/BinaryNinja-Themes\n\n## Requirements\n\n- Binary Ninja 3.5+\n- Internet access for fetching themes\n",
+  "license": {
+    "name": "MIT",
+    "text": "Copyright (c) 2026 Léo BECHET\n\nPermission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
+  },
+  "platforms": [
+    "Linux"
+  ],
+  "installinstructions": {
+    "Linux": "Make sure you have PyPySide6, os, json and requests. (Should be included in the Python environment bundled with Binary Ninja.)"
+  },
+  "dependencies": {
+    "pip": [
+      "os",
+      "json",
+      "requests"
+    ],
+    "apt": [
+    ],
+    "installers": [
+    ],
+    "other": [
+    ]
+  },
+  "version": "0.1.0",
+  "author": "lele394",
+  "minimumbinaryninjaversion": 8104
+}
