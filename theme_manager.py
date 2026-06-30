@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QPushButton, QLabel,
     QWidget, QHBoxLayout, QScrollArea, QLineEdit
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices
 
 # -----------------------------
 # CONFIG
@@ -24,6 +25,8 @@ REPOS = [
 
 BASE_DIR = os.path.expanduser("~/.binaryninja/")
 THEME_DIR = os.path.join(BASE_DIR, "community-themes/")
+
+ISSUES_URL = "https://github.com/lele394/Binary-Ninja-Theme-Manager/issues/new"
 
 # GLOBAL MEMORY CACHE (To avoid GitHub Rate Limits)
 # Structure: {(owner, repo, path): [themes]}
@@ -132,10 +135,12 @@ class ThemeManagerDialog(QDialog):
 
         header = QLabel(
             'Have a repo you want to add to this list? '
-            '<a href="#">Open an issue here</a>'
+            f'<a href="{ISSUES_URL}">Open an issue here</a>'
         )
-        header.setOpenExternalLinks(False)
         header.setTextFormat(Qt.RichText)
+        header.setOpenExternalLinks(False)
+        header.linkActivated.connect(
+            lambda url: QDesktopServices.openUrl(QUrl(url)))
         self.layout.addWidget(header)
 
         # Search Bar
