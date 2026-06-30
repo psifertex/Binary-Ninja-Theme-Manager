@@ -7,10 +7,14 @@ from binaryninja.plugin import PluginCommand
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QPushButton, QLabel,
-    QWidget, QHBoxLayout, QScrollArea, QLineEdit
+    QWidget, QHBoxLayout, QLineEdit,
+    QTreeWidget, QTreeWidgetItem, QSplitter
 )
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
+
+from .theme_colors import ThemeColorResolver
+from .preview_widget import LinearPreview, GraphPreview
 
 # -----------------------------
 # CONFIG
@@ -33,6 +37,8 @@ ISSUES_URL = "https://github.com/lele394/Binary-Ninja-Theme-Manager/issues/new"
 # Structure: {(owner, repo, path): [themes]}
 SESSION_REMOTE_CACHE = {}
 
+REMOTE_TEXT_CACHE = {}
+
 def ensure_dirs():
     os.makedirs(THEME_DIR, exist_ok=True)
 
@@ -53,6 +59,32 @@ def get_theme_display_name(theme_filename):
 def get_locally_installed_files():
     ensure_dirs()
     return [f for f in os.listdir(THEME_DIR) if f.endswith(".bntheme")]
+
+def load_local_theme_json(theme_filename):
+    """Parse an installed .bntheme into a dict (None on failure)."""
+    theme_path = os.path.join(THEME_DIR, theme_filename)
+    try:
+        with open(theme_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        log_error(f"[ThemeManager] Could not read {theme_filename}: {e}")
+        return None
+
+def load_remote_theme_json(download_url):
+    """Fetch (cached) and parse a remote .bntheme into a dict (None on failure)."""
+    text = REMOTE_TEXT_CACHE.get(download_url)
+    if text is None:
+        try:
+            text = requests.get(download_url, timeout=5).text
+            REMOTE_TEXT_CACHE[download_url] = text
+        except Exception as e:
+            log_error(f"[ThemeManager] Preview fetch failed: {e}")
+            return None
+    try:
+        return json.loads(text)
+    except Exception as e:
+        log_error(f"[ThemeManager] Could not parse remote theme: {e}")
+        return None
 
 # -----------------------------
 # GITHUB FETCH (With caching)
@@ -105,97 +137,221 @@ def download_theme(theme_obj, callback):
 # -----------------------------
 # UI COMPONENTS
 # -----------------------------
-class ThemeRow(QWidget):
-    def __init__(self, theme_name, is_installed, theme_obj=None, on_change=None):
-        super().__init__()
-        layout = QHBoxLayout()
-        layout.setContentsMargins(5, 2, 5, 2)
+# Theme rows store metadata here; group headers carry none (how we distinguish them).
+THEME_ROLE = Qt.UserRole
 
-        self.label = QLabel(theme_name)
-        btn = QPushButton("Set Active" if is_installed else "Install")
-        
-        def do_action():
-            if is_installed:
-                apply_theme(theme_name)
-            else:
-                download_theme(theme_obj, on_change)
+def _make_group_item(text):
+    """A collapsible, non-selectable section header (top-level tree node)."""
+    item = QTreeWidgetItem([text])
+    item.setFlags(Qt.ItemIsEnabled)  # expandable but not selectable
+    font = item.font(0)
+    font.setBold(True)
+    item.setFont(0, font)
+    return item
 
-        btn.clicked.connect(do_action)
-        layout.addWidget(self.label)
-        layout.addStretch()
-        layout.addWidget(btn)
-        self.setLayout(layout)
+def _make_theme_item(label, is_installed, theme_name, theme_obj):
+    item = QTreeWidgetItem([("✓ " if is_installed else "") + label])
+    item.setData(0, THEME_ROLE, {
+        "installed": is_installed,
+        "name": theme_name,
+        "obj": theme_obj,
+    })
+    return item
+
 
 class ThemeManagerDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Theme Manager")
-        self.setMinimumSize(500, 600)
-        
-        self.layout = QVBoxLayout(self)
+        self.setMinimumSize(900, 600)
+        self.resize(1000, 600)
+
+        root = QVBoxLayout(self)
 
         header = QLabel(
-            'Have a repo you want to add to this list? '
+            'Select a theme to preview it. '
+            'Have a repo to add to this list? '
             f'<a href="{ISSUES_URL}">Open an issue here</a>'
         )
         header.setTextFormat(Qt.RichText)
         header.setOpenExternalLinks(False)
         header.linkActivated.connect(
             lambda url: QDesktopServices.openUrl(QUrl(url)))
-        self.layout.addWidget(header)
+        root.addWidget(header)
+
+        splitter = QSplitter(Qt.Horizontal)
+        root.addWidget(splitter, 1)
+
+        left = QWidget()
+        left_layout = QVBoxLayout(left)
+        left_layout.setContentsMargins(0, 0, 0, 0)
 
         # Search Bar
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search themes...")
-        self.search.textChanged.connect(self.refresh_ui)
-        self.layout.addWidget(self.search)
+        self.search.setClearButtonEnabled(True)
+        self.search.textChanged.connect(self.refresh_list)
+        left_layout.addWidget(self.search)
 
-        # Scroll Area
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.container = QWidget()
-        self.container_layout = QVBoxLayout(self.container)
-        self.container_layout.setAlignment(Qt.AlignTop)
-        self.scroll.setWidget(self.container)
-        self.layout.addWidget(self.scroll)
+        self.theme_list = QTreeWidget()
+        self.theme_list.setHeaderHidden(True)
+        self.theme_list.setRootIsDecorated(True)
+        self.theme_list.setExpandsOnDoubleClick(True)
+        self.theme_list.currentItemChanged.connect(self.on_selection_changed)
+        self.theme_list.itemClicked.connect(self.on_item_clicked)
+        left_layout.addWidget(self.theme_list, 1)
+        splitter.addWidget(left)
 
-        self.refresh_ui()
+        right = QWidget()
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(0, 0, 0, 0)
 
-    def refresh_ui(self):
+        self.preview_title = QLabel("Preview")
+        self.preview_title.setStyleSheet("font-weight: bold; color: #aaa;")
+        right_layout.addWidget(self.preview_title)
+
+        # Linear and graph previews as two sections split by a native handle.
+        preview_split = QSplitter(Qt.Vertical)
+        self.linear_preview = LinearPreview()
+        self.graph_preview = GraphPreview()
+        preview_split.addWidget(self.linear_preview)
+        preview_split.addWidget(self.graph_preview)
+        preview_split.setStretchFactor(0, 0)
+        preview_split.setStretchFactor(1, 1)
+        right_layout.addWidget(preview_split, 1)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        self.action_btn = QPushButton("Select a theme")
+        self.action_btn.setEnabled(False)
+        self.action_btn.clicked.connect(self.on_action_clicked)
+        button_row.addWidget(self.action_btn)
+        right_layout.addLayout(button_row)
+        splitter.addWidget(right)
+
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([320, 880])
+
+        self.refresh_list()
+
+    def refresh_list(self, _=None):
+        """Rebuild the theme tree, preserving selection and collapse state."""
+        prev = self._current_meta()
+        prev_name = prev["name"] if prev else None
+        expanded = self._expanded_groups()  # group title -> bool
+
+        self.theme_list.blockSignals(True)
         # Clear UI
-        for i in reversed(range(self.container_layout.count())):
-            self.container_layout.itemAt(i).widget().setParent(None)
+        self.theme_list.clear()
 
         search_query = self.search.text().lower()
         local_files = get_locally_installed_files()
 
         # 1. INSTALLED SECTION
-        installed_header = QLabel("INSTALLED LOCALLY")
-        installed_header.setStyleSheet("font-weight: bold; color: #aaa; margin-top: 10px;")
-        self.container_layout.addWidget(installed_header)
-
-        for f in local_files:
-            if search_query in f.lower():
-                self.container_layout.addWidget(ThemeRow(f, True))
+        installed = [f for f in local_files if search_query in f.lower()]
+        if installed:
+            grp = _make_group_item("INSTALLED LOCALLY")
+            self.theme_list.addTopLevelItem(grp)
+            for f in installed:
+                grp.addChild(_make_theme_item(f, True, f, None))
 
         # 2. REMOTE SECTIONS
         for owner, repo, path in REPOS:
             themes = fetch_repo_themes(owner, repo, path)
-            
             # Filter themes based on search
-            filtered_themes = [t for t in themes if search_query in t["name"].lower()]
-            
-            if not filtered_themes:
+            filtered = [t for t in themes if search_query in t["name"].lower()]
+            if not filtered:
                 continue
-
-            repo_label = QLabel(f"{owner} / {repo}")
-            repo_label.setStyleSheet("font-weight: bold; color: #58a6ff; margin-top: 15px; border-bottom: 1px solid #333;")
-            self.container_layout.addWidget(repo_label)
-
-            for t in filtered_themes:
+            grp = _make_group_item(f"{owner} / {repo}")
+            self.theme_list.addTopLevelItem(grp)
+            for t in filtered:
                 # Check if already installed
                 is_installed = t["name"] in local_files
-                self.container_layout.addWidget(ThemeRow(t["name"], is_installed, t, self.refresh_ui))
+                grp.addChild(_make_theme_item(t["name"], is_installed, t["name"], t))
+
+        # Force-expand while searching so matches aren't hidden in a collapsed group.
+        searching = bool(search_query)
+        for i in range(self.theme_list.topLevelItemCount()):
+            grp = self.theme_list.topLevelItem(i)
+            grp.setExpanded(True if searching else expanded.get(grp.text(0), True))
+
+        self.theme_list.blockSignals(False)
+
+        if prev_name and not self._select_by_name(prev_name):
+            self._show_placeholder()
+
+    def _iter_theme_items(self):
+        for i in range(self.theme_list.topLevelItemCount()):
+            grp = self.theme_list.topLevelItem(i)
+            for j in range(grp.childCount()):
+                yield grp.child(j)
+
+    def _expanded_groups(self):
+        state = {}
+        for i in range(self.theme_list.topLevelItemCount()):
+            grp = self.theme_list.topLevelItem(i)
+            state[grp.text(0)] = grp.isExpanded()
+        return state
+
+    def _select_by_name(self, name):
+        for item in self._iter_theme_items():
+            meta = item.data(0, THEME_ROLE)
+            if meta and meta["name"] == name:
+                self.theme_list.setCurrentItem(item)
+                return True
+        return False
+
+    def _current_meta(self):
+        item = self.theme_list.currentItem()
+        return item.data(0, THEME_ROLE) if item else None
+
+    def on_item_clicked(self, item, _column):
+        if item.data(0, THEME_ROLE) is None:  # header row toggles instead of selecting
+            item.setExpanded(not item.isExpanded())
+
+    def on_selection_changed(self, current, _previous):
+        meta = current.data(0, THEME_ROLE) if current else None
+        if not meta:
+            self._show_placeholder()
+            return
+
+        if meta["installed"]:
+            theme_json = load_local_theme_json(meta["name"])
+        else:
+            theme_json = load_remote_theme_json(meta["obj"]["download_url"])
+
+        if not theme_json:
+            self.preview_title.setText("Preview — failed to load theme")
+            self._set_resolver(None)
+            self.action_btn.setEnabled(False)
+            return
+
+        display_name = theme_json.get("name", meta["name"])
+        self.preview_title.setText(f"Preview — {display_name}")
+        self._set_resolver(ThemeColorResolver(theme_json))
+
+        self.action_btn.setEnabled(True)
+        self.action_btn.setText("Set Active" if meta["installed"] else "Install")
+
+    def _set_resolver(self, resolver):
+        self.linear_preview.set_resolver(resolver)
+        self.graph_preview.set_resolver(resolver)
+
+    def _show_placeholder(self):
+        self.preview_title.setText("Preview")
+        self._set_resolver(None)
+        self.action_btn.setText("Select a theme")
+        self.action_btn.setEnabled(False)
+
+    def on_action_clicked(self):
+        meta = self._current_meta()
+        if not meta:
+            return
+        if meta["installed"]:
+            apply_theme(meta["name"])
+        else:
+            download_theme(meta["obj"], lambda: self.refresh_list())
 
 # -----------------------------
 # REGISTRATION
