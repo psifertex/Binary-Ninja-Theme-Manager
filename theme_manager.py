@@ -2,7 +2,7 @@ import os
 import json
 import requests
 
-from binaryninja import Settings, log_info, log_error
+from binaryninja import Settings, log_info, log_error, user_directory
 from binaryninja.plugin import PluginCommand
 
 from PySide6.QtWidgets import (
@@ -23,8 +23,9 @@ REPOS = [
     ("FuzzySecurity", "BinaryNinja-Themes", ""),
 ]
 
-BASE_DIR = os.path.expanduser("~/.binaryninja/")
-THEME_DIR = os.path.join(BASE_DIR, "community-themes/")
+# Cross-platform user dir (issue #1); falls back to the Linux default.
+BASE_DIR = user_directory() or os.path.expanduser("~/.binaryninja")
+THEME_DIR = os.path.join(BASE_DIR, "community-themes")
 
 ISSUES_URL = "https://github.com/lele394/Binary-Ninja-Theme-Manager/issues/new"
 
