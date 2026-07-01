@@ -1,6 +1,6 @@
 # A Theme Manager For Binary Ninja
 
-> Developped for Binary Ninja 3.5
+> Developed for Binary Ninja 5.3
 
 A simple plugin for browsing, installing, and applying community `.bntheme` themes inside Binary Ninja.
 
@@ -10,14 +10,17 @@ A simple plugin for browsing, installing, and applying community `.bntheme` them
 
 ## What it does
 
-- Lists themes from configured GitHub repositories
+- Lists themes from configured GitHub repositories, grouped in a collapsible list
 - Shows installed themes locally
-- Lets you apply a theme directly from the UI
-- Basic search/filter for theme names
+- Live preview of a theme — a sample linear view and flow graph rendered with the
+  theme's own colors, before you apply it (remote themes are fetched on demand)
+- Installs and applies themes directly from the UI
+- Search/filter with a quick-clear button
 
 ## Storage
 
-Installed themes are saved to:
+Installed themes are saved under Binary Ninja's user directory (platform-dependent),
+in the `community-themes/` subfolder — e.g. on Linux:
 
 ```
 ~/.binaryninja/community-themes/
@@ -32,8 +35,9 @@ Plugins → Theme Manager
 ```
 
 Then:
-- Click **Install** to download a theme
-- Click **Set** to apply it (may need restart)
+- **Select** a theme in the list to preview it
+- Click **Install** to download a remote theme, or **Set Active** to apply an
+  installed one (may need restart)
 
 ## Supported repos
 
@@ -54,6 +58,6 @@ Then:
 
 ## Requirements
 
-- Binary Ninja 3.5+
+- Binary Ninja 5.3+
 - Internet access for fetching themes
 
