@@ -18,11 +18,8 @@ graph in its own colors.
 - Shows themes installed locally
 - Live preview of a theme 
 - Installs and applies themes directly from the UI
-- Search/filter with a quick-clear button, plus keywords listed under the
-  search field:
-  - `@dark` / `@light` — filter by the theme's background brightness
-  - `@local` — only themes already on disk or built in, usable offline
-  - `@remote` — only themes not installed yet
+- Search/filter with a quick-clear button, plus `@dark`, `@light`, `@local`
+  and `@remote` keywords for filtering by brightness or availability
 
 ## Storage
 
@@ -94,6 +91,6 @@ copyright notice is retained alongside this fork's, as MIT requires.
 
 In August 2026 the upstream repository replaced its MIT license with terms that
 grant no rights and restrict AI-related use of the project. This fork's history
-does not include that change — every line of code here predates it and was
-published under MIT. If you want the upstream project under its current terms,
-follow the link above.
+does not include that change and all code here predates it and was published
+under MIT. If you want the upstream project under its current terms, follow the
+link above.
