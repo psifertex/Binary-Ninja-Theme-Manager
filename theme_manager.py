@@ -166,7 +166,10 @@ def fetch_repo_themes(owner, repo, path=""):
         return []
 
 def apply_theme(theme_filename):
-    display_name = get_theme_display_name(theme_filename)
+    apply_theme_name(get_theme_display_name(theme_filename))
+
+def apply_theme_name(display_name):
+    """Activate a theme BN already knows by name."""
     try:
         from binaryninjaui import setActiveTheme
     except Exception:
@@ -181,6 +184,21 @@ def apply_theme(theme_filename):
         log_error(f"[ThemeManager] Could not apply {display_name}: {e}")
         return
     log_info(f"Applied: {display_name}")
+
+def get_builtin_themes():
+    """Themes BN ships itself: everything it knows, minus what we installed.
+
+    These are compiled into Binary Ninja rather than stored as .bntheme files,
+    so they can be activated but not previewed.
+    """
+    try:
+        from binaryninjaui import getAvailableThemes
+        available = [str(t) for t in getAvailableThemes()]
+    except Exception as e:
+        log_error(f"[ThemeManager] Could not list built-in themes: {e}")
+        return []
+    installed = {get_theme_display_name(f) for f in get_locally_installed_files()}
+    return [t for t in available if t not in installed]
 
 def download_theme(theme_obj):
     """Fetch a theme and write it to disk; returns the filename or None.
@@ -274,10 +292,11 @@ def _make_group_item(text):
     item.setFont(0, font)
     return item
 
-def _make_theme_item(label, is_installed, theme_name, theme_obj):
-    item = QTreeWidgetItem([("✓ " if is_installed else "") + label])
+def _make_theme_item(label, kind, theme_name, theme_obj=None):
+    """kind is "installed", "remote" or "builtin"."""
+    item = QTreeWidgetItem([("✓ " if kind == "installed" else "") + label])
     item.setData(0, THEME_ROLE, {
-        "installed": is_installed,
+        "kind": kind,
         "name": theme_name,
         "obj": theme_obj,
     })
@@ -424,6 +443,14 @@ class ThemeManagerDialog(QDialog):
         search_query = self.search.text().lower()
         local_files = get_locally_installed_files()
 
+        # 0. BUILT-IN SECTION
+        builtin = [t for t in get_builtin_themes() if search_query in t.lower()]
+        if builtin:
+            grp = _make_group_item("BUILT IN")
+            self.theme_list.addTopLevelItem(grp)
+            for name in builtin:
+                grp.addChild(_make_theme_item(name, "builtin", name))
+
         # 1. INSTALLED SECTION
         installed = [f for f in local_files
                      if search_query in f.lower()
@@ -432,7 +459,7 @@ class ThemeManagerDialog(QDialog):
             grp = _make_group_item("INSTALLED LOCALLY")
             self.theme_list.addTopLevelItem(grp)
             for f in installed:
-                grp.addChild(_make_theme_item(f, True, f, None))
+                grp.addChild(_make_theme_item(f, "installed", f))
 
         # 2. REMOTE SECTIONS (fetched in the background; cached ones render now)
         for owner, repo, path in REPOS:
@@ -452,8 +479,8 @@ class ThemeManagerDialog(QDialog):
             self.theme_list.addTopLevelItem(grp)
             for t in filtered:
                 # Check if already installed
-                is_installed = t["name"] in local_files
-                grp.addChild(_make_theme_item(t["name"], is_installed, t["name"], t))
+                kind = "installed" if t["name"] in local_files else "remote"
+                grp.addChild(_make_theme_item(t["name"], kind, t["name"], t))
 
         # Force-expand while searching so matches aren't hidden in a collapsed group.
         searching = bool(search_query)
@@ -501,7 +528,12 @@ class ThemeManagerDialog(QDialog):
             self._show_placeholder()
             return
 
-        if meta["installed"]:
+        if meta["kind"] == "builtin":
+            self._pending_preview = None
+            self._show_builtin(meta)
+            return
+
+        if meta["kind"] == "installed":
             self._pending_preview = None
             self._show_theme(load_local_theme_json(meta["name"]), meta)
             return
@@ -527,6 +559,14 @@ class ThemeManagerDialog(QDialog):
         self._pending_preview = None
         self._show_theme(theme_json, meta)
 
+    def _show_builtin(self, meta):
+        """Built-ins are compiled into BN, so there is no JSON to preview."""
+        self.preview_title.setText(
+            f"Preview \u2014 {meta['name']} (built in, no preview available)")
+        self._set_resolver(None)
+        self.action_btn.setEnabled(True)
+        self.action_btn.setText("Set Active")
+
     def _show_theme(self, theme_json, meta):
         if not theme_json:
             self.preview_title.setText("Preview \u2014 failed to load theme")
@@ -539,7 +579,8 @@ class ThemeManagerDialog(QDialog):
         self._set_resolver(ThemeColorResolver(theme_json))
 
         self.action_btn.setEnabled(True)
-        self.action_btn.setText("Set Active" if meta["installed"] else "Install")
+        self.action_btn.setText(
+            "Set Active" if meta["kind"] == "installed" else "Install")
 
     def _set_resolver(self, resolver):
         self.linear_preview.set_resolver(resolver)
@@ -562,7 +603,10 @@ class ThemeManagerDialog(QDialog):
         meta = self._current_meta()
         if not meta:
             return
-        if meta["installed"]:
+        if meta["kind"] == "builtin":
+            apply_theme_name(meta["name"])
+            return
+        if meta["kind"] == "installed":
             apply_theme(meta["name"])
             return
         self.action_btn.setEnabled(False)

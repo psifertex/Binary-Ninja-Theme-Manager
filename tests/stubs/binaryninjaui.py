@@ -4,7 +4,7 @@
 #  'resetUserThemes', 'setActiveTheme']   -- note: no `Theme` class.
 CALLS = []
 _active = ["Default"]
-_available = ["Default"]
+_available = ["Default", "Dark", "Light"]   # BN ships these compiled in
 
 def setActiveTheme(name, saveToSettings=True):
     CALLS.append(("setActiveTheme", name, saveToSettings))
@@ -14,7 +14,7 @@ def setActiveTheme(name, saveToSettings=True):
 
 def refreshUserThemes():
     CALLS.append(("refreshUserThemes",))
-    _available[:] = ["Default"] + _scan()
+    _available[:] = ["Default", "Dark", "Light"] + _scan()
 
 def getAvailableThemes(): return list(_available)
 def getActiveTheme(): return _active[0]

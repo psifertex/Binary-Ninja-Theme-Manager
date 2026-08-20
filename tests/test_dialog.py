@@ -36,7 +36,11 @@ assert dlg.theme_list.topLevelItemCount() > 0
 # select the installed theme -> preview resolver must be populated
 items = list(dlg._iter_theme_items())
 print("  theme rows:", len(items))
-dlg.theme_list.setCurrentItem(items[0])
+# built-ins are compiled into BN and have no JSON, so pick one that previews
+previewable = [i for i in items
+               if i.data(0, tm.THEME_ROLE)["kind"] != "builtin"]
+assert previewable, "no previewable theme rows"
+dlg.theme_list.setCurrentItem(previewable[0])
 assert dlg.linear_preview._resolver is not None, "linear preview has no resolver"
 assert dlg.graph_preview._resolver is not None, "graph preview has no resolver"
 

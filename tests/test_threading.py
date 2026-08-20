@@ -53,10 +53,12 @@ assert not any("loading" in l for l in labels), labels
 print("  loading placeholders resolved into real groups")
 
 # selecting an uncached remote theme must not block either
-items = list(dlg._iter_theme_items())
+remote = [i for i in dlg._iter_theme_items()
+          if i.data(0, tm.THEME_ROLE)["kind"] == "remote"]
+assert remote, "no remote theme rows to fetch"
 tm.REMOTE_TEXT_CACHE.clear()
 t0 = time.monotonic()
-dlg.theme_list.setCurrentItem(items[0])
+dlg.theme_list.setCurrentItem(remote[0])
 elapsed = time.monotonic() - t0
 assert elapsed < 0.20, f"preview blocked for {elapsed:.2f}s"
 assert pump(lambda: dlg.linear_preview._resolver is not None), "preview never arrived"
