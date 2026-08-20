@@ -32,7 +32,7 @@ REPOS = [
     ("FuzzySecurity", "BinaryNinja-Themes", ""),
 ]
 
-ISSUES_URL = "https://github.com/psifertex/Binary-Ninja-Theme-Manager/issues/new"
+ISSUES_URL = "https://github.com/psifertex/Swatch/issues/new"
 
 # GLOBAL MEMORY CACHE (To avoid GitHub Rate Limits)
 # Structure: {(owner, repo, path): [themes]}
@@ -63,7 +63,7 @@ def ensure_dirs():
     """Create and return the theme directory, or None if it can't be located."""
     path = theme_dir()
     if path is None:
-        log_error(f"[ThemeManager] {NO_USER_DIR_MSG}")
+        log_error(f"[Swatch] {NO_USER_DIR_MSG}")
         return None
     os.makedirs(path, exist_ok=True)
     return path
@@ -94,7 +94,7 @@ def get_theme_display_name(theme_filename):
             DISPLAY_NAME_CACHE[key] = name
         return name
     except Exception as e:
-        log_error(f"[ThemeManager] Could not read {theme_filename}: {e}")
+        log_error(f"[Swatch] Could not read {theme_filename}: {e}")
         return theme_filename
 
 def get_locally_installed_files():
@@ -113,7 +113,7 @@ def load_local_theme_json(theme_filename):
         with open(theme_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        log_error(f"[ThemeManager] Could not read {theme_filename}: {e}")
+        log_error(f"[Swatch] Could not read {theme_filename}: {e}")
         return None
 
 def load_remote_theme_json(download_url):
@@ -124,12 +124,12 @@ def load_remote_theme_json(download_url):
             text = requests.get(download_url, timeout=5).text
             REMOTE_TEXT_CACHE[download_url] = text
         except Exception as e:
-            log_error(f"[ThemeManager] Preview fetch failed: {e}")
+            log_error(f"[Swatch] Preview fetch failed: {e}")
             return None
     try:
         return json.loads(text)
     except Exception as e:
-        log_error(f"[ThemeManager] Could not parse remote theme: {e}")
+        log_error(f"[Swatch] Could not parse remote theme: {e}")
         return None
 
 # -----------------------------
@@ -144,12 +144,12 @@ def fetch_repo_themes(owner, repo, path=""):
     if failed_at is not None and time.monotonic() - failed_at < FETCH_RETRY_SECONDS:
         return []
 
-    log_info(f"[ThemeManager] Fetching remote: {owner}/{repo}")
+    log_info(f"[Swatch] Fetching remote: {owner}/{repo}")
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
     try:
         r = requests.get(url, timeout=5)
         if r.status_code != 200:
-            log_error(f"[ThemeManager] {owner}/{repo} returned HTTP {r.status_code}")
+            log_error(f"[Swatch] {owner}/{repo} returned HTTP {r.status_code}")
             FAILED_FETCH_TIMES[key] = time.monotonic()
             return []
         
@@ -162,7 +162,7 @@ def fetch_repo_themes(owner, repo, path=""):
         FAILED_FETCH_TIMES.pop(key, None)
         return themes
     except Exception as e:
-        log_error(f"[ThemeManager] Fetch error for {owner}/{repo}: {e}")
+        log_error(f"[Swatch] Fetch error for {owner}/{repo}: {e}")
         FAILED_FETCH_TIMES[key] = time.monotonic()
         return []
 
@@ -182,7 +182,7 @@ def apply_theme_name(display_name):
     try:
         setActiveTheme(display_name)
     except Exception as e:
-        log_error(f"[ThemeManager] Could not apply {display_name}: {e}")
+        log_error(f"[Swatch] Could not apply {display_name}: {e}")
         return
     log_info(f"Applied: {display_name}")
 
@@ -202,7 +202,7 @@ def _read_builtin_themes():
         try:
             data = json.loads(bytes(f.readAll()).decode("utf-8"))
         except Exception as e:
-            log_error(f"[ThemeManager] Could not parse {info.fileName()}: {e}")
+            log_error(f"[Swatch] Could not parse {info.fileName()}: {e}")
             continue
         finally:
             f.close()
@@ -218,7 +218,7 @@ def builtin_theme_json(name):
         try:
             _BUILTIN_THEME_DATA = _read_builtin_themes()
         except Exception as e:
-            log_error(f"[ThemeManager] Could not read bundled themes: {e}")
+            log_error(f"[Swatch] Could not read bundled themes: {e}")
             _BUILTIN_THEME_DATA = {}
     return _BUILTIN_THEME_DATA.get(name)
 
@@ -232,7 +232,7 @@ def get_builtin_themes():
         from binaryninjaui import getAvailableThemes
         available = [str(t) for t in getAvailableThemes()]
     except Exception as e:
-        log_error(f"[ThemeManager] Could not list built-in themes: {e}")
+        log_error(f"[Swatch] Could not list built-in themes: {e}")
         return []
     installed = {get_theme_display_name(f) for f in get_locally_installed_files()}
     return [t for t in available if t not in installed]
@@ -248,7 +248,7 @@ def download_theme(theme_obj):
         return None
     name = os.path.basename(theme_obj["name"])
     if not name.endswith(".bntheme"):
-        log_error(f"[ThemeManager] Refusing to write unexpected file: {name}")
+        log_error(f"[Swatch] Refusing to write unexpected file: {name}")
         return None
     try:
         data = requests.get(theme_obj["download_url"], timeout=10).text
@@ -256,7 +256,7 @@ def download_theme(theme_obj):
             f.write(data)
         return name
     except Exception as e:
-        log_error(f"[ThemeManager] Download failed: {e}")
+        log_error(f"[Swatch] Download failed: {e}")
         return None
 
 def refresh_installed_themes():
@@ -269,7 +269,7 @@ def refresh_installed_themes():
         from binaryninjaui import refreshUserThemes
         refreshUserThemes()
     except Exception as e:
-        log_error(f"[ThemeManager] Could not refresh theme list: {e}")
+        log_error(f"[Swatch] Could not refresh theme list: {e}")
 
 def fetch_repo_task(owner, repo, path):
     """fetch_repo_themes, tagged with its key so the UI can match the reply."""
@@ -350,7 +350,7 @@ class ThemeManagerDialog(QDialog):
         self._loading = set()     # repos with a fetch in flight
         self._attempted = set()   # repos already tried this dialog
         self._pending_preview = None
-        self.setWindowTitle("Theme Manager")
+        self.setWindowTitle("Swatch")
         self.setMinimumSize(900, 600)
         self.resize(1000, 600)
 
@@ -445,7 +445,7 @@ class ThemeManagerDialog(QDialog):
         if not self._alive:
             return
         if error is not None:
-            log_error(f"[ThemeManager] Background task failed: {error}")
+            log_error(f"[Swatch] Background task failed: {error}")
             return
         on_done(result)
 
@@ -638,7 +638,7 @@ class ThemeManagerDialog(QDialog):
         if base is None:
             return
         if not QDesktopServices.openUrl(QUrl.fromLocalFile(base)):
-            log_error(f"[ThemeManager] Could not open {base}")
+            log_error(f"[Swatch] Could not open {base}")
 
     def on_action_clicked(self):
         meta = self._current_meta()
@@ -668,12 +668,12 @@ from binaryninjaui import UIAction, UIActionHandler, Menu
 
 def open_manager(context):
     if theme_dir() is None:
-        log_error(f"[ThemeManager] {NO_USER_DIR_MSG}")
-        show_message_box("Theme Manager", NO_USER_DIR_MSG)
+        log_error(f"[Swatch] {NO_USER_DIR_MSG}")
+        show_message_box("Swatch", NO_USER_DIR_MSG)
         return
     dlg = ThemeManagerDialog()
     dlg.exec()
 
-UIAction.registerAction("Theme Manager")
-UIActionHandler.globalActions().bindAction("Theme Manager", UIAction(open_manager))
-Menu.mainMenu("Plugins").addAction("Theme Manager", "Themes")
+UIAction.registerAction("Swatch")
+UIActionHandler.globalActions().bindAction("Swatch", UIAction(open_manager))
+Menu.mainMenu("Plugins").addAction("Swatch", "Themes")

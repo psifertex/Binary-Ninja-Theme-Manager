@@ -1,10 +1,15 @@
-# A Theme Manager For Binary Ninja
+# Swatch
 
-A simple plugin for browsing, installing, and applying community [`.bntheme`](https://docs.binary.ninja/dev/themes.html) themes inside Binary Ninja.
+> Color themes for Binary Ninja, with a live preview before you switch.
+
+Browse, preview, and apply [`.bntheme`](https://docs.binary.ninja/dev/themes.html)
+color themes inside Binary Ninja — both the themes Binary Ninja ships and ones
+from community repositories. Every theme renders a sample linear view and flow
+graph in its own colors, so you can see it before committing to it.
 
 ## Preview
 
-![Theme Manager](https://github.com/psifertex/Binary-Ninja-Theme-Manager/blob/main/rsc/image.png?raw=true)
+![Swatch](https://github.com/psifertex/Swatch/blob/main/rsc/image.png?raw=true)
 
 ## What it does
 
@@ -36,7 +41,7 @@ for the `.bntheme` file format.
 Open:
 
 ```
-Plugins → Theme Manager
+Plugins → Swatch
 ```
 
 Then:
