@@ -2,7 +2,9 @@ import os
 import json
 import requests
 
-from binaryninja import Settings, log_info, log_error, user_directory
+from binaryninja import (
+    Settings, log_info, log_error, user_directory, show_message_box
+)
 from binaryninja.plugin import PluginCommand
 
 from PySide6.QtWidgets import (
@@ -27,10 +29,6 @@ REPOS = [
     ("FuzzySecurity", "BinaryNinja-Themes", ""),
 ]
 
-# Cross-platform user dir (issue #1); falls back to the Linux default.
-BASE_DIR = user_directory() or os.path.expanduser("~/.binaryninja")
-THEME_DIR = os.path.join(BASE_DIR, "community-themes")
-
 ISSUES_URL = "https://github.com/lele394/Binary-Ninja-Theme-Manager/issues/new"
 
 # GLOBAL MEMORY CACHE (To avoid GitHub Rate Limits)
@@ -39,15 +37,38 @@ SESSION_REMOTE_CACHE = {}
 
 REMOTE_TEXT_CACHE = {}
 
+NO_USER_DIR_MSG = ("Binary Ninja's user directory could not be determined, so "
+                   "there is nowhere to install themes.")
+
+def theme_dir():
+    """Where themes live, or None if BN's user directory is unavailable.
+
+    Resolved lazily rather than at import time: user_directory() returns None
+    outside a running core, and caching that would poison the whole session.
+    """
+    base = user_directory()
+    if not base:
+        return None
+    return os.path.join(base, "community-themes")
+
 def ensure_dirs():
-    os.makedirs(THEME_DIR, exist_ok=True)
+    """Create and return the theme directory, or None if it can't be located."""
+    path = theme_dir()
+    if path is None:
+        log_error(f"[ThemeManager] {NO_USER_DIR_MSG}")
+        return None
+    os.makedirs(path, exist_ok=True)
+    return path
 
 # -----------------------------
 # THEME UTILS
 # -----------------------------
 def get_theme_display_name(theme_filename):
     """Reads the JSON inside the .bntheme to get the actual UI name."""
-    theme_path = os.path.join(THEME_DIR, theme_filename)
+    base = theme_dir()
+    if base is None:
+        return theme_filename
+    theme_path = os.path.join(base, theme_filename)
     if not os.path.exists(theme_path):
         return theme_filename
     try:
@@ -57,12 +78,17 @@ def get_theme_display_name(theme_filename):
         return theme_filename
 
 def get_locally_installed_files():
-    ensure_dirs()
-    return [f for f in os.listdir(THEME_DIR) if f.endswith(".bntheme")]
+    base = ensure_dirs()
+    if base is None:
+        return []
+    return [f for f in os.listdir(base) if f.endswith(".bntheme")]
 
 def load_local_theme_json(theme_filename):
     """Parse an installed .bntheme into a dict (None on failure)."""
-    theme_path = os.path.join(THEME_DIR, theme_filename)
+    base = theme_dir()
+    if base is None:
+        return None
+    theme_path = os.path.join(base, theme_filename)
     try:
         with open(theme_path, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -126,9 +152,12 @@ def apply_theme(theme_filename):
         log_info(f"Applied: {display_name} (Restart required)")
 
 def download_theme(theme_obj, callback):
+    base = ensure_dirs()
+    if base is None:
+        return
     try:
         data = requests.get(theme_obj["download_url"]).text
-        with open(os.path.join(THEME_DIR, theme_obj["name"]), "w") as f:
+        with open(os.path.join(base, theme_obj["name"]), "w") as f:
             f.write(data)
         callback()
     except Exception as e:
@@ -359,6 +388,10 @@ class ThemeManagerDialog(QDialog):
 from binaryninjaui import UIAction, UIActionHandler, Menu
 
 def open_manager(context):
+    if theme_dir() is None:
+        log_error(f"[ThemeManager] {NO_USER_DIR_MSG}")
+        show_message_box("Theme Manager", NO_USER_DIR_MSG)
+        return
     dlg = ThemeManagerDialog()
     dlg.exec()
 
