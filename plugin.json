@@ -21,8 +21,6 @@
   },
   "dependencies": {
     "pip": [
-      "os",
-      "json",
       "requests"
     ],
     "apt": [
