@@ -12,7 +12,9 @@ from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QLineEdit,
     QTreeWidget, QTreeWidgetItem, QSplitter
 )
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import (
+    Qt, QUrl, QObject, QRunnable, QThreadPool, Signal, Slot
+)
 from PySide6.QtGui import QDesktopServices
 
 from .theme_colors import ThemeColorResolver
@@ -180,34 +182,72 @@ def apply_theme(theme_filename):
         return
     log_info(f"Applied: {display_name}")
 
-def download_theme(theme_obj, callback):
+def download_theme(theme_obj):
+    """Fetch a theme and write it to disk; returns the filename or None.
+
+    Network and disk only, so this is safe to run off the UI thread. Callers
+    must run refresh_installed_themes() on the UI thread afterwards.
+    """
     base = ensure_dirs()
     if base is None:
-        return
+        return None
+    name = os.path.basename(theme_obj["name"])
+    if not name.endswith(".bntheme"):
+        log_error(f"[ThemeManager] Refusing to write unexpected file: {name}")
+        return None
     try:
         data = requests.get(theme_obj["download_url"], timeout=10).text
-        name = os.path.basename(theme_obj["name"])
-        if not name.endswith(".bntheme"):
-            log_error(f"[ThemeManager] Refusing to write unexpected file: {name}")
-            return
         with open(os.path.join(base, name), "w") as f:
             f.write(data)
-        # Without this BN never scans the new file, so Set Active would ask for
-        # a theme it has no record of.
-        try:
-            from binaryninjaui import refreshUserThemes
-            refreshUserThemes()
-        except Exception as e:
-            log_error(f"[ThemeManager] Could not refresh theme list: {e}")
-        callback()
+        return name
     except Exception as e:
-        log_error(f"Download failed: {e}")
+        log_error(f"[ThemeManager] Download failed: {e}")
+        return None
+
+def refresh_installed_themes():
+    """Make BN rescan the theme folder. Touches the UI, so main thread only.
+
+    Without this BN never sees a newly downloaded file, and Set Active would
+    ask for a theme it has no record of.
+    """
+    try:
+        from binaryninjaui import refreshUserThemes
+        refreshUserThemes()
+    except Exception as e:
+        log_error(f"[ThemeManager] Could not refresh theme list: {e}")
+
+def fetch_repo_task(owner, repo, path):
+    """fetch_repo_themes, tagged with its key so the UI can match the reply."""
+    return ((owner, repo, path), fetch_repo_themes(owner, repo, path))
 
 # -----------------------------
 # UI COMPONENTS
 # -----------------------------
 # Theme rows store metadata here; group headers carry none (how we distinguish them).
 THEME_ROLE = Qt.UserRole
+
+
+class _TaskSignals(QObject):
+    # (callback, result, error) -- object so Python values survive the queue.
+    finished = Signal(object, object, object)
+
+
+class _Task(QRunnable):
+    """Runs one function on a pool thread and reports back to the UI thread."""
+
+    def __init__(self, fn, callback, *args):
+        super().__init__()
+        self._fn = fn
+        self._args = args
+        self.callback = callback
+        self.signals = _TaskSignals()
+
+    @Slot()
+    def run(self):
+        try:
+            self.signals.finished.emit(self.callback, self._fn(*self._args), None)
+        except Exception as e:
+            self.signals.finished.emit(self.callback, None, e)
 
 def _remote_display_name(theme_obj):
     """Display name of a remote theme, only if it was already fetched."""
@@ -247,6 +287,13 @@ def _make_theme_item(label, is_installed, theme_name, theme_obj):
 class ThemeManagerDialog(QDialog):
     def __init__(self):
         super().__init__()
+        self._pool = QThreadPool()
+        self._pool.setMaxThreadCount(4)
+        self._alive = True
+        self._tasks = {}          # signals object -> task, kept alive in flight
+        self._loading = set()     # repos with a fetch in flight
+        self._attempted = set()   # repos already tried this dialog
+        self._pending_preview = None
         self.setWindowTitle("Theme Manager")
         self.setMinimumSize(900, 600)
         self.resize(1000, 600)
@@ -325,6 +372,45 @@ class ThemeManagerDialog(QDialog):
 
         self.refresh_list()
 
+    def _run(self, fn, on_done, *args):
+        """Run fn(*args) off the UI thread; deliver its result to on_done."""
+        task = _Task(fn, on_done, *args)
+        # The receiver must be a bound method of this dialog: a queued signal
+        # needs a QObject on the UI thread to route to, and a bare lambda has
+        # none. Holding the task also keeps its signals object alive until the
+        # reply lands.
+        self._tasks[task.signals] = task
+        task.signals.finished.connect(self._deliver, Qt.QueuedConnection)
+        self._pool.start(task)
+
+    @Slot(object, object, object)
+    def _deliver(self, on_done, result, error):
+        self._tasks.pop(self.sender(), None)
+        if not self._alive:
+            return
+        if error is not None:
+            log_error(f"[ThemeManager] Background task failed: {error}")
+            return
+        on_done(result)
+
+    def closeEvent(self, event):
+        # In-flight replies must not touch widgets that are on their way out.
+        self._alive = False
+        super().closeEvent(event)
+
+    def _ensure_fetch(self, owner, repo, path):
+        key = (owner, repo, path)
+        if key in self._loading or key in self._attempted:
+            return
+        self._loading.add(key)
+        self._attempted.add(key)
+        self._run(fetch_repo_task, self._on_repo_fetched, owner, repo, path)
+
+    def _on_repo_fetched(self, result):
+        key, _themes = result
+        self._loading.discard(key)
+        self.refresh_list()
+
     def refresh_list(self, _=None):
         """Rebuild the theme tree, preserving selection and collapse state."""
         prev = self._current_meta()
@@ -348,9 +434,16 @@ class ThemeManagerDialog(QDialog):
             for f in installed:
                 grp.addChild(_make_theme_item(f, True, f, None))
 
-        # 2. REMOTE SECTIONS
+        # 2. REMOTE SECTIONS (fetched in the background; cached ones render now)
         for owner, repo, path in REPOS:
-            themes = fetch_repo_themes(owner, repo, path)
+            key = (owner, repo, path)
+            if key not in SESSION_REMOTE_CACHE:
+                self._ensure_fetch(owner, repo, path)
+                if key in self._loading:
+                    self.theme_list.addTopLevelItem(
+                        _make_group_item(f"{owner} / {repo}  (loading\u2026)"))
+                continue
+            themes = SESSION_REMOTE_CACHE[key]
             # Filter themes based on search
             filtered = [t for t in themes if _matches(t, search_query)]
             if not filtered:
@@ -409,12 +502,34 @@ class ThemeManagerDialog(QDialog):
             return
 
         if meta["installed"]:
-            theme_json = load_local_theme_json(meta["name"])
-        else:
-            theme_json = load_remote_theme_json(meta["obj"]["download_url"])
+            self._pending_preview = None
+            self._show_theme(load_local_theme_json(meta["name"]), meta)
+            return
 
+        url = meta["obj"]["download_url"]
+        if url in REMOTE_TEXT_CACHE:
+            self._pending_preview = None
+            self._show_theme(load_remote_theme_json(url), meta)
+            return
+
+        # Uncached: fetch off the UI thread and show the result if the
+        # selection has not moved on by the time it lands.
+        self._pending_preview = meta["name"]
+        self.preview_title.setText(f"Preview \u2014 loading {meta['name']}\u2026")
+        self._set_resolver(None)
+        self.action_btn.setEnabled(False)
+        self._run(load_remote_theme_json,
+                  lambda tj, m=meta: self._on_preview_fetched(tj, m), url)
+
+    def _on_preview_fetched(self, theme_json, meta):
+        if self._pending_preview != meta["name"]:
+            return  # selection moved while we were fetching
+        self._pending_preview = None
+        self._show_theme(theme_json, meta)
+
+    def _show_theme(self, theme_json, meta):
         if not theme_json:
-            self.preview_title.setText("Preview — failed to load theme")
+            self.preview_title.setText("Preview \u2014 failed to load theme")
             self._set_resolver(None)
             self.action_btn.setEnabled(False)
             return
@@ -449,8 +564,17 @@ class ThemeManagerDialog(QDialog):
             return
         if meta["installed"]:
             apply_theme(meta["name"])
-        else:
-            download_theme(meta["obj"], lambda: self.refresh_list())
+            return
+        self.action_btn.setEnabled(False)
+        self.action_btn.setText("Installing\u2026")
+        self._run(download_theme,
+                  lambda name: self._on_download_done(name), meta["obj"])
+
+    def _on_download_done(self, name):
+        self.action_btn.setEnabled(True)
+        if name:
+            refresh_installed_themes()
+        self.refresh_list()
 
 # -----------------------------
 # REGISTRATION
