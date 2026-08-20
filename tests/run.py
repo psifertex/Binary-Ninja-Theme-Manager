@@ -4,6 +4,10 @@
 Runs with any Python 3; it locates bnpython3 via BN's `lastrun` file and
 re-runs each test there, so the tests exercise the same interpreter and Qt
 build the plugin will actually load under.
+
+With --system it uses the current interpreter instead, needing only PySide6
+and requests. Binary Ninja itself is stubbed, so the full suite runs that way
+too -- that is how CI runs it.
 """
 
 import os
@@ -28,24 +32,34 @@ TEST_FILES = [
 
 
 def main():
-    try:
-        python = bn_paths.bn_python()
-        pyside = bn_paths.pyside_dir()
-    except RuntimeError as e:
-        print(f"error: {e}", file=sys.stderr)
-        return 2
+    args = sys.argv[1:]
+    system = "--system" in args
+    selected = [a for a in args if not a.startswith("-")] or TEST_FILES
 
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.pathsep.join(
-        [pyside] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+    if system:
+        python = sys.executable
+        # No display on a CI runner; pip's PySide6 ships the offscreen plugin
+        # (Binary Ninja's Qt build does not, which is why this is system-only).
+        env.setdefault("QT_QPA_PLATFORM", "offscreen")
+        print("binary ninja: not used (--system)")
+    else:
+        try:
+            python = bn_paths.bn_python()
+            pyside = bn_paths.pyside_dir()
+        except RuntimeError as e:
+            print(f"error: {e}", file=sys.stderr)
+            print("hint: run with --system to use the current interpreter "
+                  "instead (needs PySide6 and requests).", file=sys.stderr)
+            return 2
+        env["PYTHONPATH"] = os.pathsep.join(
+            [pyside] + ([env["PYTHONPATH"]] if env.get("PYTHONPATH") else []))
+        print(f"binary ninja: {bn_paths.lastrun_dir()}")
 
     version = subprocess.run(
         [python, "-c", "import sys; print(sys.version.split()[0])"],
         capture_output=True, text=True, env=env).stdout.strip()
-    print(f"binary ninja: {bn_paths.lastrun_dir()}")
     print(f"interpreter:  {python} ({version})\n")
-
-    selected = sys.argv[1:] or TEST_FILES
     failures = []
     for name in selected:
         result = subprocess.run([python, os.path.join(TESTS, name)],
