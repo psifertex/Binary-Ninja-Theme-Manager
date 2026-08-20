@@ -56,3 +56,45 @@ assert dlg.linear_preview._resolver is not None, "installed theme lost its previ
 dlg.action_btn.click()
 assert ui.getActiveTheme() == "Mine", ui.getActiveTheme()
 print("PASS builtin: stock themes listed and applicable, installed ones unaffected")
+
+
+# --- previews for built-ins come from BN's bundled .bntheme resources ---
+# BN registers them under ":/themes"; QDir/QFile read a plain directory the
+# same way, so this exercises the identical code path.
+import tempfile
+
+bundled = tempfile.mkdtemp()
+with open(os.path.join(bundled, "dark.bntheme"), "w") as f:
+    json.dump({
+        "name": "Dark",
+        "colors": {"background": [40, 40, 40], "content": [220, 220, 220]},
+        "theme-colors": {"instructionColor": ["~", "content", "background", 64],
+                         "addressColor": [162, 217, 175, 255]},
+        "palette": {"WindowText": "content", "Base": "background"},
+    }, f)
+
+tm.BUILTIN_THEME_RESOURCE_DIR = bundled
+tm._BUILTIN_THEME_DATA = None
+assert tm.builtin_theme_json("Dark")["name"] == "Dark"
+assert tm.builtin_theme_json("Light") is None, "unbundled theme should not resolve"
+print("  bundled themes indexed by display name")
+
+dlg.refresh_list()
+rows = {i.text(0): i for i in dlg._iter_theme_items()
+        if i.data(0, tm.THEME_ROLE)["kind"] == "builtin"}
+
+dlg.theme_list.setCurrentItem(rows["Dark"])
+assert dlg.linear_preview._resolver is not None, "bundled built-in did not preview"
+assert dlg.action_btn.text() == "Set Active", dlg.action_btn.text()
+assert "no preview" not in dlg.preview_title.text(), dlg.preview_title.text()
+from PySide6.QtGui import QPixmap
+for w in (dlg.linear_preview, dlg.graph_preview):
+    w.resize(400, 200); w.render(QPixmap(400, 200))
+print("  built-in preview renders from the bundled .bntheme")
+
+# a built-in BN knows but does not bundle still applies, just without a preview
+dlg.theme_list.setCurrentItem(rows["Light"])
+assert dlg.linear_preview._resolver is None
+assert dlg.action_btn.isEnabled() and dlg.action_btn.text() == "Set Active"
+assert "no preview" in dlg.preview_title.text()
+print("PASS bundled: built-ins preview when bundled, stay applicable when not")

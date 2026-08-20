@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
     QTreeWidget, QTreeWidgetItem, QSplitter
 )
 from PySide6.QtCore import (
-    Qt, QUrl, QObject, QRunnable, QThreadPool, Signal, Slot
+    Qt, QUrl, QDir, QFile, QIODevice, QObject, QRunnable, QThreadPool,
+    Signal, Slot
 )
 from PySide6.QtGui import QDesktopServices
 
@@ -184,6 +185,42 @@ def apply_theme_name(display_name):
         log_error(f"[ThemeManager] Could not apply {display_name}: {e}")
         return
     log_info(f"Applied: {display_name}")
+
+# BN compiles its default themes in as Qt resources under this prefix and loads
+# them with QDir(":/themes") itself, so we can read the same .bntheme JSON.
+# Builds older than that ship nothing here and simply get no preview.
+BUILTIN_THEME_RESOURCE_DIR = ":/themes"
+_BUILTIN_THEME_DATA = None
+
+def _read_builtin_themes():
+    themes = {}
+    for info in QDir(BUILTIN_THEME_RESOURCE_DIR).entryInfoList(
+            QDir.Files | QDir.Readable, QDir.Name):
+        f = QFile(info.absoluteFilePath())
+        if not f.open(QIODevice.ReadOnly):
+            continue
+        try:
+            data = json.loads(bytes(f.readAll()).decode("utf-8"))
+        except Exception as e:
+            log_error(f"[ThemeManager] Could not parse {info.fileName()}: {e}")
+            continue
+        finally:
+            f.close()
+        name = data.get("name")
+        if name:
+            themes[name] = data
+    return themes
+
+def builtin_theme_json(name):
+    """The .bntheme BN bundles for a default theme, or None if unavailable."""
+    global _BUILTIN_THEME_DATA
+    if _BUILTIN_THEME_DATA is None:
+        try:
+            _BUILTIN_THEME_DATA = _read_builtin_themes()
+        except Exception as e:
+            log_error(f"[ThemeManager] Could not read bundled themes: {e}")
+            _BUILTIN_THEME_DATA = {}
+    return _BUILTIN_THEME_DATA.get(name)
 
 def get_builtin_themes():
     """Themes BN ships itself: everything it knows, minus what we installed.
@@ -560,7 +597,11 @@ class ThemeManagerDialog(QDialog):
         self._show_theme(theme_json, meta)
 
     def _show_builtin(self, meta):
-        """Built-ins are compiled into BN, so there is no JSON to preview."""
+        theme_json = builtin_theme_json(meta["name"])
+        if theme_json:
+            self._show_theme(theme_json, meta)
+            return
+        # Not bundled (e.g. an older BN build): still applicable, just unpreviewable.
         self.preview_title.setText(
             f"Preview \u2014 {meta['name']} (built in, no preview available)")
         self._set_resolver(None)
@@ -580,7 +621,7 @@ class ThemeManagerDialog(QDialog):
 
         self.action_btn.setEnabled(True)
         self.action_btn.setText(
-            "Set Active" if meta["kind"] == "installed" else "Install")
+            "Install" if meta["kind"] == "remote" else "Set Active")
 
     def _set_resolver(self, resolver):
         self.linear_preview.set_resolver(resolver)
