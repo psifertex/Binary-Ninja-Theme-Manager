@@ -171,7 +171,11 @@ def download_theme(theme_obj, callback):
         return
     try:
         data = requests.get(theme_obj["download_url"], timeout=10).text
-        with open(os.path.join(base, theme_obj["name"]), "w") as f:
+        name = os.path.basename(theme_obj["name"])
+        if not name.endswith(".bntheme"):
+            log_error(f"[ThemeManager] Refusing to write unexpected file: {name}")
+            return
+        with open(os.path.join(base, name), "w") as f:
             f.write(data)
         callback()
     except Exception as e:
