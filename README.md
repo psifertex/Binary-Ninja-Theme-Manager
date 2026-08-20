@@ -42,8 +42,10 @@ for the `.bntheme` file format.
 Open:
 
 ```
-Plugins → Swatch
+Plugins → Swatch (Theme Picker)
 ```
+
+To report a problem, use **Plugins → Swatch (Report an Issue)**.
 
 ## Official themes
 

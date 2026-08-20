@@ -31,13 +31,17 @@ class UIAction:
     @staticmethod
     def registerAction(name, *a):
         REGISTERED.append(name)
+BOUND = []
+MENU = []
+
 class _H:
-    def bindAction(self, *a): pass
+    def bindAction(self, name, action): BOUND.append(name)
 class UIActionHandler:
     @staticmethod
     def globalActions(): return _H()
 class _M:
-    def addAction(self, *a): pass
+    def __init__(self, menu): self.menu = menu
+    def addAction(self, name, group, *a): MENU.append((self.menu, name, group))
 class Menu:
     @staticmethod
-    def mainMenu(*a): return _M()
+    def mainMenu(name): return _M(name)

@@ -450,18 +450,6 @@ class ThemeManagerDialog(QDialog):
 
         root = QVBoxLayout(self)
 
-        header = QLabel(
-            'Select a theme to preview it. '
-            'Add your own repositories under '
-            f'<b>Settings &rarr; Swatch</b>, or '
-            f'<a href="{ISSUES_URL}">open an issue</a> to suggest one.'
-        )
-        header.setTextFormat(Qt.RichText)
-        header.setOpenExternalLinks(False)
-        header.linkActivated.connect(
-            lambda url: QDesktopServices.openUrl(QUrl(url)))
-        root.addWidget(header)
-
         splitter = QSplitter(Qt.Horizontal)
         root.addWidget(splitter, 1)
 
@@ -808,6 +796,7 @@ from binaryninjaui import UIAction, UIActionHandler, Menu
 # The parenthetical keeps the action findable by "theme" in the command palette
 # and says what it does, without needing a separate alias.
 ACTION_NAME = "Swatch (Theme Picker)"
+ISSUE_ACTION_NAME = "Swatch (Report an Issue)"
 
 register_settings()
 
@@ -819,6 +808,12 @@ def open_manager(context):
     dlg = ThemeManagerDialog()
     dlg.exec()
 
-UIAction.registerAction(ACTION_NAME)
-UIActionHandler.globalActions().bindAction(ACTION_NAME, UIAction(open_manager))
-Menu.mainMenu("Plugins").addAction(ACTION_NAME, "Themes")
+def report_issue(context):
+    if not QDesktopServices.openUrl(QUrl(ISSUES_URL)):
+        log_error(f"[Swatch] Could not open {ISSUES_URL}")
+
+for _name, _handler in ((ACTION_NAME, open_manager),
+                        (ISSUE_ACTION_NAME, report_issue)):
+    UIAction.registerAction(_name)
+    UIActionHandler.globalActions().bindAction(_name, UIAction(_handler))
+    Menu.mainMenu("Plugins").addAction(_name, "Themes")
