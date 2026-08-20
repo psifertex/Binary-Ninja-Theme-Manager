@@ -6,7 +6,6 @@ import requests
 from binaryninja import (
     Settings, log_info, log_error, user_directory, show_message_box
 )
-from binaryninja.plugin import PluginCommand
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QPushButton, QLabel,
