@@ -59,7 +59,7 @@ assert any("loading" in l for l in labels), labels
 print("  loading placeholders shown while work is outstanding")
 
 gate.set()
-assert pump(lambda: len(tm.SESSION_REMOTE_CACHE) >= len(tm.REPOS)), "fetches never completed"
+assert pump(lambda: len(tm.SESSION_REMOTE_CACHE) >= len(tm.get_repos())), "fetches never completed"
 assert fetch_threads, "no fetch happened"
 assert MAIN not in fetch_threads, "a fetch ran on the UI thread"
 print(f"  {len(fetch_threads)} fetches completed, none on the UI thread")

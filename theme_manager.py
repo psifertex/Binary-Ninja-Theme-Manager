@@ -24,13 +24,57 @@ from .preview_widget import LinearPreview, GraphPreview
 # -----------------------------
 # CONFIG
 # -----------------------------
-REPOS = [
-    ("Vector35", "community-themes", ""),
-    ("catppuccin", "binary-ninja", "themes"),
-    ("dracula", "binary-ninja", "theme"),
-    ("evanrichter", "base16-binary-ninja", "colors"),
-    ("FuzzySecurity", "BinaryNinja-Themes", ""),
+DEFAULT_REPOS = [
+    "Vector35/community-themes",
+    "catppuccin/binary-ninja/themes",
+    "dracula/binary-ninja/theme",
+    "evanrichter/base16-binary-ninja/colors",
+    "FuzzySecurity/BinaryNinja-Themes",
 ]
+
+REPOS_SETTING = "swatch.repositories"
+
+def register_settings():
+    """Expose the repository list in Settings, as an editable array."""
+    settings = Settings()
+    try:
+        settings.register_group("swatch", "Swatch")
+        settings.register_setting(REPOS_SETTING, json.dumps({
+            "title": "Theme Repositories",
+            "type": "array",
+            "sorted": False,
+            "default": DEFAULT_REPOS,
+            "description": (
+                "GitHub repositories to list themes from, written as "
+                "owner/repo, or owner/repo/path when the themes live in a "
+                "subdirectory."),
+            "ignore": ["SettingsProjectScope", "SettingsResourceScope"],
+        }))
+    except Exception as e:
+        log_error(f"[Swatch] Could not register settings: {e}")
+
+def parse_repo(entry):
+    """"owner/repo/some/path" -> ("owner", "repo", "some/path")."""
+    parts = [p for p in str(entry).strip().strip("/").split("/") if p]
+    if len(parts) < 2:
+        return None
+    return (parts[0], parts[1], "/".join(parts[2:]))
+
+def get_repos():
+    """Configured repositories as (owner, repo, path) tuples."""
+    try:
+        entries = Settings().get_string_list(REPOS_SETTING)
+    except Exception as e:
+        log_error(f"[Swatch] Could not read {REPOS_SETTING}: {e}")
+        entries = DEFAULT_REPOS
+    repos = []
+    for entry in entries:
+        parsed = parse_repo(entry)
+        if parsed is None:
+            log_error(f"[Swatch] Ignoring malformed repository entry: {entry!r}")
+            continue
+        repos.append(parsed)
+    return repos
 
 ISSUES_URL = "https://github.com/psifertex/Swatch/issues/new"
 
@@ -397,8 +441,9 @@ class ThemeManagerDialog(QDialog):
 
         header = QLabel(
             'Select a theme to preview it. '
-            'Have a repo to add to this list? '
-            f'<a href="{ISSUES_URL}">Open an issue here</a>'
+            'Add your own repositories under '
+            f'<b>Settings &rarr; Swatch</b>, or '
+            f'<a href="{ISSUES_URL}">open an issue</a> to suggest one.'
         )
         header.setTextFormat(Qt.RichText)
         header.setOpenExternalLinks(False)
@@ -542,7 +587,8 @@ class ThemeManagerDialog(QDialog):
                 grp.addChild(_make_theme_item(f, "installed", f))
 
         # 2. REMOTE SECTIONS (fetched in the background; cached ones render now)
-        for owner, repo, path in REPOS:
+        repos = get_repos()
+        for owner, repo, path in repos:
             key = (owner, repo, path)
             if key not in SESSION_REMOTE_CACHE:
                 self._ensure_fetch(owner, repo, path)
@@ -741,6 +787,8 @@ from binaryninjaui import UIAction, UIActionHandler, Menu
 # The parenthetical keeps the action findable by "theme" in the command palette
 # and says what it does, without needing a separate alias.
 ACTION_NAME = "Swatch (Theme Picker)"
+
+register_settings()
 
 def open_manager(context):
     if theme_dir() is None:

@@ -66,6 +66,10 @@ Swatch reads to preview a built-in theme without switching to it first.
 
 ## Community repos
 
+These are listed by default. Add or remove repositories under
+**Settings → Swatch → Theme Repositories**, writing each as `owner/repo`, or
+`owner/repo/path` when the themes live in a subdirectory.
+
 - Vector35 – community themes  
   https://github.com/Vector35/community-themes
 

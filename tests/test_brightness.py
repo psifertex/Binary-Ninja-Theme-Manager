@@ -66,7 +66,7 @@ def pump(pred, limit=20.0):
         if pred(): return True
         time.sleep(0.01)
     return False
-assert pump(lambda: len(tm.SESSION_REMOTE_CACHE) >= len(tm.REPOS))
+assert pump(lambda: len(tm.SESSION_REMOTE_CACHE) >= len(tm.get_repos()))
 
 def rows(q):
     dlg.search.setText(q)
