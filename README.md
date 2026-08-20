@@ -13,6 +13,8 @@ graph in its own colors, so you can see it before committing to it.
 
 ## What it does
 
+- Lists Binary Ninja's own built-in themes, so you can switch back to a stock
+  theme without leaving the dialog
 - Lists themes from configured GitHub repositories, grouped in a collapsible list
 - Shows installed themes locally
 - Live preview of a theme — a sample linear view and flow graph rendered with the
@@ -47,9 +49,21 @@ Plugins → Swatch
 Then:
 - **Select** a theme in the list to preview it
 - Click **Install** to download a remote theme, or **Set Active** to apply an
-  installed one (may need restart)
+  installed or built-in one (may need restart)
+- Click **Open Theme Folder** to reach the files on disk, e.g. to delete a theme
 
-## Supported repos
+## Official themes
+
+Binary Ninja's own themes are listed under **BUILT IN**. They ship with Binary
+Ninja rather than being downloaded, so they are always available and never need
+installing. Their sources are open and live in the API repository:
+
+https://github.com/Vector35/binaryninja-api/tree/dev/themes
+
+Binary Ninja bundles those `.bntheme` files as Qt resources, which is what
+Swatch reads to preview a built-in theme without switching to it first.
+
+## Community repos
 
 - Vector35 – community themes  
   https://github.com/Vector35/community-themes
