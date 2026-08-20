@@ -26,14 +26,11 @@
     "pip": [
       "requests"
     ],
-    "apt": [
-    ],
-    "installers": [
-    ],
-    "other": [
-    ]
+    "apt": [],
+    "installers": [],
+    "other": []
   },
-  "version": "0.2.0",
+  "version": "1.0",
   "author": "psifertex (original by lele394)",
   "minimumbinaryninjaversion": 8104
 }
