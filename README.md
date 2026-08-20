@@ -20,7 +20,8 @@ graph in its own colors, so you can see it before committing to it.
 - Live preview of a theme — a sample linear view and flow graph rendered with the
   theme's own colors, before you apply it (remote themes are fetched on demand)
 - Installs and applies themes directly from the UI
-- Search/filter with a quick-clear button
+- Search/filter with a quick-clear button, plus `@dark` and `@light`
+  keywords that filter by a theme's background brightness
 
 ## Storage
 

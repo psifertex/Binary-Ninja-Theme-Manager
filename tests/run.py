@@ -27,6 +27,7 @@ TEST_FILES = [
     "test_theme_api.py",
     "test_builtin.py",
     "test_action.py",
+    "test_brightness.py",
     "test_search.py",
     "test_browse.py",
     "test_threading.py",

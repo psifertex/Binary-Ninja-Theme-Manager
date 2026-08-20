@@ -304,17 +304,55 @@ class _Task(QRunnable):
         except Exception as e:
             self.signals.finished.emit(self.callback, None, e)
 
+BRIGHTNESS_KEYWORDS = ("@dark", "@light")
+
+def theme_brightness(theme_json):
+    """"dark" or "light" from the theme's background, or None if unknown.
+
+    Uses the same relative-luminance weighting the sRGB spec does, so a
+    mid-tone background lands on the side a reader would call it.
+    """
+    if not theme_json:
+        return None
+    try:
+        color = ThemeColorResolver(theme_json).view_background()
+    except Exception:
+        return None
+    luminance = (0.2126 * color.red()
+                 + 0.7152 * color.green()
+                 + 0.0722 * color.blue()) / 255.0
+    return "light" if luminance > 0.5 else "dark"
+
+def parse_search(text):
+    """Split a query into (text, brightness), pulling out @dark / @light."""
+    brightness = None
+    words = []
+    for word in text.split():
+        lowered = word.lower()
+        if lowered in BRIGHTNESS_KEYWORDS:
+            brightness = lowered[1:]
+        else:
+            words.append(word)
+    return " ".join(words).lower(), brightness
+
 def _remote_display_name(theme_obj):
     """Display name of a remote theme, only if it was already fetched."""
+    data = remote_theme_json(theme_obj)
+    return data.get("name") if data else None
+
+def remote_theme_json(theme_obj):
+    """Already-fetched JSON for a remote theme, without hitting the network."""
     text = REMOTE_TEXT_CACHE.get(theme_obj["download_url"])
     if text is None:
         return None
     try:
-        return json.loads(text).get("name")
+        return json.loads(text)
     except Exception:
         return None
 
 def _matches(theme_obj, query):
+    if not query:
+        return True
     if query in theme_obj["name"].lower():
         return True
     display = _remote_display_name(theme_obj)
@@ -350,6 +388,7 @@ class ThemeManagerDialog(QDialog):
         self._loading = set()     # repos with a fetch in flight
         self._attempted = set()   # repos already tried this dialog
         self._pending_preview = None
+        self._warming = set()     # remote themes being fetched to judge brightness
         self.setWindowTitle("Swatch")
         self.setMinimumSize(900, 600)
         self.resize(1000, 600)
@@ -376,7 +415,8 @@ class ThemeManagerDialog(QDialog):
 
         # Search Bar
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Search themes...")
+        self.search.setPlaceholderText(
+            "Search themes\u2026  (@dark / @light to filter by brightness)")
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.refresh_list)
         left_layout.addWidget(self.search)
@@ -477,11 +517,13 @@ class ThemeManagerDialog(QDialog):
         # Clear UI
         self.theme_list.clear()
 
-        search_query = self.search.text().lower()
+        search_query, brightness = parse_search(self.search.text())
         local_files = get_locally_installed_files()
 
         # 0. BUILT-IN SECTION
-        builtin = [t for t in get_builtin_themes() if search_query in t.lower()]
+        builtin = [t for t in get_builtin_themes()
+                   if search_query in t.lower()
+                   and self._brightness_ok(brightness, builtin_theme_json(t))]
         if builtin:
             grp = _make_group_item("BUILT IN")
             self.theme_list.addTopLevelItem(grp)
@@ -490,8 +532,9 @@ class ThemeManagerDialog(QDialog):
 
         # 1. INSTALLED SECTION
         installed = [f for f in local_files
-                     if search_query in f.lower()
-                     or search_query in get_theme_display_name(f).lower()]
+                     if (search_query in f.lower()
+                         or search_query in get_theme_display_name(f).lower())
+                     and self._brightness_ok(brightness, load_local_theme_json(f))]
         if installed:
             grp = _make_group_item("INSTALLED LOCALLY")
             self.theme_list.addTopLevelItem(grp)
@@ -508,8 +551,13 @@ class ThemeManagerDialog(QDialog):
                         _make_group_item(f"{owner} / {repo}  (loading\u2026)"))
                 continue
             themes = SESSION_REMOTE_CACHE[key]
+            if brightness:
+                # Brightness needs each theme's colors, so fetch what we lack.
+                self._warm_remote_json(themes)
             # Filter themes based on search
-            filtered = [t for t in themes if _matches(t, search_query)]
+            filtered = [t for t in themes
+                        if _matches(t, search_query)
+                        and self._brightness_ok(brightness, remote_theme_json(t))]
             if not filtered:
                 continue
             grp = _make_group_item(f"{owner} / {repo}")
@@ -529,6 +577,30 @@ class ThemeManagerDialog(QDialog):
 
         if prev_name and not self._select_by_name(prev_name):
             self._show_placeholder()
+
+    def _brightness_ok(self, brightness, theme_json):
+        """True when no brightness filter is active, or the theme matches it.
+
+        A theme whose colors we have not fetched yet cannot be judged, so it is
+        held back until _warm_remote_json has retrieved it.
+        """
+        if brightness is None:
+            return True
+        return theme_brightness(theme_json) == brightness
+
+    def _warm_remote_json(self, themes):
+        for theme_obj in themes:
+            url = theme_obj["download_url"]
+            if url in REMOTE_TEXT_CACHE or url in self._warming:
+                continue
+            self._warming.add(url)
+            self._run(load_remote_theme_json,
+                      lambda _result, u=url: self._on_warm_done(u), url)
+
+    def _on_warm_done(self, url):
+        self._warming.discard(url)
+        if not self._warming:      # one rebuild per batch, not one per theme
+            self.refresh_list()
 
     def _iter_theme_items(self):
         for i in range(self.theme_list.topLevelItemCount()):
