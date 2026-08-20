@@ -2,8 +2,7 @@
   "pluginmetadataversion": 2,
   "name": "Theme Manager",
   "type": [
-    "ui",
-    "helper"
+    "ui"
   ],
   "api": [
     "python3"
