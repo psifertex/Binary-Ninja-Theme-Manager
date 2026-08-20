@@ -306,6 +306,11 @@ class ThemeManagerDialog(QDialog):
         right_layout.addWidget(preview_split, 1)
 
         button_row = QHBoxLayout()
+        self.browse_btn = QPushButton("Open Theme Folder")
+        self.browse_btn.setToolTip(
+            "Open the folder holding installed themes, e.g. to delete one")
+        self.browse_btn.clicked.connect(self.on_browse_clicked)
+        button_row.addWidget(self.browse_btn)
         button_row.addStretch()
         self.action_btn = QPushButton("Select a theme")
         self.action_btn.setEnabled(False)
@@ -430,6 +435,13 @@ class ThemeManagerDialog(QDialog):
         self._set_resolver(None)
         self.action_btn.setText("Select a theme")
         self.action_btn.setEnabled(False)
+
+    def on_browse_clicked(self):
+        base = ensure_dirs()
+        if base is None:
+            return
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(base)):
+            log_error(f"[ThemeManager] Could not open {base}")
 
     def on_action_clicked(self):
         meta = self._current_meta()
