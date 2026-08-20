@@ -177,6 +177,13 @@ def download_theme(theme_obj, callback):
             return
         with open(os.path.join(base, name), "w") as f:
             f.write(data)
+        # Without this BN never scans the new file, so Set Active would ask for
+        # a theme it has no record of.
+        try:
+            from binaryninjaui import refreshUserThemes
+            refreshUserThemes()
+        except Exception as e:
+            log_error(f"[ThemeManager] Could not refresh theme list: {e}")
         callback()
     except Exception as e:
         log_error(f"Download failed: {e}")
