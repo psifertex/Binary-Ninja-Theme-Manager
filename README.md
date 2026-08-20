@@ -1,7 +1,5 @@
 # A Theme Manager For Binary Ninja
 
-> Developed for Binary Ninja 5.3
-
 A simple plugin for browsing, installing, and applying community `.bntheme` themes inside Binary Ninja.
 
 ## Preview
@@ -58,7 +56,7 @@ Then:
 
 ## Requirements
 
-- Binary Ninja 5.3+
+- Binary Ninja (see `minimumbinaryninjaversion` in `plugin.json` for the minimum build)
 - Internet access for fetching themes
 
 
