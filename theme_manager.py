@@ -29,7 +29,7 @@ REPOS = [
     ("FuzzySecurity", "BinaryNinja-Themes", ""),
 ]
 
-ISSUES_URL = "https://github.com/lele394/Binary-Ninja-Theme-Manager/issues/new"
+ISSUES_URL = "https://github.com/psifertex/Binary-Ninja-Theme-Manager/issues/new"
 
 # GLOBAL MEMORY CACHE (To avoid GitHub Rate Limits)
 # Structure: {(owner, repo, path): [themes]}
