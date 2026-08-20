@@ -156,7 +156,7 @@ def download_theme(theme_obj, callback):
     if base is None:
         return
     try:
-        data = requests.get(theme_obj["download_url"]).text
+        data = requests.get(theme_obj["download_url"], timeout=10).text
         with open(os.path.join(base, theme_obj["name"]), "w") as f:
             f.write(data)
         callback()
