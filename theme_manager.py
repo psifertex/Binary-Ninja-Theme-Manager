@@ -156,14 +156,14 @@ def apply_theme(theme_filename):
     display_name = get_theme_display_name(theme_filename)
     Settings().set_string("ui.theme.name", display_name)
     
-    # Hot reload for BN 4.0+
-    # Untested, I have 3.5
+    # Hot reload for BN 4.0+; older builds need a restart.
     try:
         from binaryninjaui import Theme
         Theme.setTheme(display_name)
-        log_info(f"Applied: {display_name}")
-    except:
+    except Exception:
         log_info(f"Applied: {display_name} (Restart required)")
+        return
+    log_info(f"Applied: {display_name}")
 
 def download_theme(theme_obj, callback):
     base = ensure_dirs()
