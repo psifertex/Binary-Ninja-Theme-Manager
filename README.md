@@ -6,7 +6,7 @@ A simple plugin for browsing, installing, and applying community `.bntheme` them
 
 ## Preview
 
-![Theme Manager](https://github.com/lele394/Binary-Ninja-Theme-Manager/blob/main/rsc/image.png?raw=true)
+![Theme Manager](https://github.com/psifertex/Binary-Ninja-Theme-Manager/blob/main/rsc/image.png?raw=true)
 
 ## What it does
 
