@@ -1,6 +1,6 @@
 # A Theme Manager For Binary Ninja
 
-A simple plugin for browsing, installing, and applying community `.bntheme` themes inside Binary Ninja.
+A simple plugin for browsing, installing, and applying community [`.bntheme`](https://docs.binary.ninja/dev/themes.html) themes inside Binary Ninja.
 
 ## Preview
 
@@ -17,12 +17,19 @@ A simple plugin for browsing, installing, and applying community `.bntheme` them
 
 ## Storage
 
-Installed themes are saved under Binary Ninja's user directory (platform-dependent),
-in the `community-themes/` subfolder — e.g. on Linux:
+Installed themes are saved under Binary Ninja's
+[user folder](https://docs.binary.ninja/guide/index.html#user-folder), which is
+platform-dependent, in the `community-themes/` subfolder — e.g. on Linux:
 
 ```
 ~/.binaryninja/community-themes/
 ```
+
+Binary Ninja scans both `themes/` and `community-themes/` there, so themes
+installed by this plugin are picked up alongside any you cloned yourself.
+
+Writing your own? See [Creating Themes](https://docs.binary.ninja/dev/themes.html)
+for the `.bntheme` file format.
 
 ## Usage
 
