@@ -349,6 +349,15 @@ class _Task(QRunnable):
             self.signals.finished.emit(self.callback, None, e)
 
 BRIGHTNESS_KEYWORDS = ("@dark", "@light")
+SCOPE_KEYWORDS = ("@local", "@remote")
+
+SEARCH_HINT = "@dark  @light  @local  @remote"
+SEARCH_HINT_TOOLTIP = (
+    "Filter with keywords:\n"
+    "  @dark / @light   by the theme's background brightness\n"
+    "  @local           themes already on disk or built in\n"
+    "  @remote          themes not installed yet\n"
+    "Combine them with ordinary search text.")
 
 def theme_brightness(theme_json):
     """"dark" or "light" from the theme's background, or None if unknown.
@@ -368,16 +377,18 @@ def theme_brightness(theme_json):
     return "light" if luminance > 0.5 else "dark"
 
 def parse_search(text):
-    """Split a query into (text, brightness), pulling out @dark / @light."""
-    brightness = None
+    """Split a query into (text, brightness, scope), pulling out @keywords."""
+    brightness = scope = None
     words = []
     for word in text.split():
         lowered = word.lower()
         if lowered in BRIGHTNESS_KEYWORDS:
             brightness = lowered[1:]
+        elif lowered in SCOPE_KEYWORDS:
+            scope = lowered[1:]
         else:
             words.append(word)
-    return " ".join(words).lower(), brightness
+    return " ".join(words).lower(), brightness, scope
 
 def _remote_display_name(theme_obj):
     """Display name of a remote theme, only if it was already fetched."""
@@ -460,11 +471,21 @@ class ThemeManagerDialog(QDialog):
 
         # Search Bar
         self.search = QLineEdit()
-        self.search.setPlaceholderText(
-            "Search themes\u2026  (@dark / @light to filter by brightness)")
+        self.search.setPlaceholderText("Search themes\u2026")
+        self.search.setToolTip(SEARCH_HINT_TOOLTIP)
         self.search.setClearButtonEnabled(True)
         self.search.textChanged.connect(self.refresh_list)
         left_layout.addWidget(self.search)
+
+        # Keywords live on their own line: the search field is too narrow to
+        # spell them out without truncating.
+        hint = QLabel(SEARCH_HINT)
+        hint.setToolTip(SEARCH_HINT_TOOLTIP)
+        hint_font = hint.font()
+        hint_font.setPointSizeF(max(1.0, hint_font.pointSizeF() - 1.5))
+        hint.setFont(hint_font)
+        hint.setEnabled(False)      # dimmed by the palette, not a hardcoded color
+        left_layout.addWidget(hint)
 
         self.theme_list = QTreeWidget()
         self.theme_list.setHeaderHidden(True)
@@ -562,11 +583,11 @@ class ThemeManagerDialog(QDialog):
         # Clear UI
         self.theme_list.clear()
 
-        search_query, brightness = parse_search(self.search.text())
+        search_query, brightness, scope = parse_search(self.search.text())
         local_files = get_locally_installed_files()
 
         # 0. BUILT-IN SECTION
-        builtin = [t for t in get_builtin_themes()
+        builtin = [] if scope == "remote" else [t for t in get_builtin_themes()
                    if search_query in t.lower()
                    and self._brightness_ok(brightness, builtin_theme_json(t))]
         if builtin:
@@ -576,7 +597,7 @@ class ThemeManagerDialog(QDialog):
                 grp.addChild(_make_theme_item(name, "builtin", name))
 
         # 1. INSTALLED SECTION
-        installed = [f for f in local_files
+        installed = [] if scope == "remote" else [f for f in local_files
                      if (search_query in f.lower()
                          or search_query in get_theme_display_name(f).lower())
                      and self._brightness_ok(brightness, load_local_theme_json(f))]
@@ -587,7 +608,7 @@ class ThemeManagerDialog(QDialog):
                 grp.addChild(_make_theme_item(f, "installed", f))
 
         # 2. REMOTE SECTIONS (fetched in the background; cached ones render now)
-        repos = get_repos()
+        repos = [] if scope == "local" else get_repos()
         for owner, repo, path in repos:
             key = (owner, repo, path)
             if key not in SESSION_REMOTE_CACHE:

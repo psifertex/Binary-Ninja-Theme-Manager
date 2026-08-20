@@ -12,12 +12,14 @@ tm = load_plugin()
 from PySide6.QtWidgets import QApplication
 
 # --- keyword parsing ---
-assert tm.parse_search("solarized") == ("solarized", None)
-assert tm.parse_search("@dark") == ("", "dark")
-assert tm.parse_search("@LIGHT") == ("", "light")
-assert tm.parse_search("solarized @dark") == ("solarized", "dark")
-assert tm.parse_search("@dark solarized") == ("solarized", "dark")
-assert tm.parse_search("email@dark.com") == ("email@dark.com", None), "only a bare keyword counts"
+assert tm.parse_search("solarized") == ("solarized", None, None)
+assert tm.parse_search("@dark") == ("", "dark", None)
+assert tm.parse_search("@LIGHT") == ("", "light", None)
+assert tm.parse_search("solarized @dark") == ("solarized", "dark", None)
+assert tm.parse_search("@dark solarized") == ("solarized", "dark", None)
+assert tm.parse_search("email@dark.com") == ("email@dark.com", None, None), "only a bare keyword counts"
+assert tm.parse_search("@local") == ("", None, "local")
+assert tm.parse_search("@remote @dark x") == ("x", "dark", "remote")
 print("  keywords parsed out of the query, text preserved")
 
 # --- luminance classification ---
@@ -95,5 +97,6 @@ combined = rows("mine @dark")
 assert combined == ["mine-dark.bntheme"], combined
 print("  text and keyword combine:", combined)
 
-assert dlg.search.placeholderText().count("@dark") == 1
-print("PASS brightness:", dlg.search.placeholderText())
+assert "@dark" in tm.SEARCH_HINT and "@dark" not in dlg.search.placeholderText(), \
+    "keywords belong in the hint row, not the narrow placeholder"
+print("PASS brightness: hint row is", tm.SEARCH_HINT)

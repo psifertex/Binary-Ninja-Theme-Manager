@@ -3,9 +3,9 @@
 > Color themes for Binary Ninja, with a live preview before you switch.
 
 Browse, preview, and apply [`.bntheme`](https://docs.binary.ninja/dev/themes.html)
-color themes inside Binary Ninja — both the themes Binary Ninja ships and ones
+color themes inside Binary Ninja include the themes Binary Ninja ships and ones
 from community repositories. Every theme renders a sample linear view and flow
-graph in its own colors, so you can see it before committing to it.
+graph in its own colors.
 
 ## Preview
 
@@ -13,15 +13,16 @@ graph in its own colors, so you can see it before committing to it.
 
 ## What it does
 
-- Lists Binary Ninja's own built-in themes, so you can switch back to a stock
-  theme without leaving the dialog
-- Lists themes from configured GitHub repositories, grouped in a collapsible list
-- Shows installed themes locally
-- Live preview of a theme — a sample linear view and flow graph rendered with the
-  theme's own colors, before you apply it (remote themes are fetched on demand)
+- Lists Binary Ninja's own built-in themes
+- Lists themes from configured GitHub repositories
+- Shows themes installed locally
+- Live preview of a theme 
 - Installs and applies themes directly from the UI
-- Search/filter with a quick-clear button, plus `@dark` and `@light`
-  keywords that filter by a theme's background brightness
+- Search/filter with a quick-clear button, plus keywords listed under the
+  search field:
+  - `@dark` / `@light` — filter by the theme's background brightness
+  - `@local` — only themes already on disk or built in, usable offline
+  - `@remote` — only themes not installed yet
 
 ## Storage
 
@@ -46,12 +47,6 @@ Open:
 ```
 Plugins → Swatch
 ```
-
-Then:
-- **Select** a theme in the list to preview it
-- Click **Install** to download a remote theme, or **Set Active** to apply an
-  installed or built-in one (may need restart)
-- Click **Open Theme Folder** to reach the files on disk, e.g. to delete a theme
 
 ## Official themes
 

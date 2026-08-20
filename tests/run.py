@@ -29,6 +29,7 @@ TEST_FILES = [
     "test_action.py",
     "test_brightness.py",
     "test_settings.py",
+    "test_scope.py",
     "test_search.py",
     "test_browse.py",
     "test_threading.py",
