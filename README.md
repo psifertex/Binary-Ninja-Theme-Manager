@@ -61,3 +61,15 @@ Then:
 - Binary Ninja 5.3+
 - Internet access for fetching themes
 
+
+## Credits and licensing
+
+Originally created by [Léo BECHET (lele394)](https://github.com/lele394/Binary-Ninja-Theme-Manager)
+and published under the MIT license, which this fork continues under. Léo's
+copyright notice is retained alongside this fork's, as MIT requires.
+
+In August 2026 the upstream repository replaced its MIT license with terms that
+grant no rights and restrict AI-related use of the project. This fork's history
+does not include that change — every line of code here predates it and was
+published under MIT. If you want the upstream project under its current terms,
+follow the link above.
