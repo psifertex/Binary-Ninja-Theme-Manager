@@ -24,10 +24,13 @@ def resetUserThemes(): CALLS.append(("resetUserThemes",))
 _scan_hook = [lambda: []]
 def _scan(): return _scan_hook[0]()
 
+REGISTERED = []
+
 class UIAction:
     def __init__(self, *a): pass
     @staticmethod
-    def registerAction(*a): pass
+    def registerAction(name, *a):
+        REGISTERED.append(name)
 class _H:
     def bindAction(self, *a): pass
 class UIActionHandler:

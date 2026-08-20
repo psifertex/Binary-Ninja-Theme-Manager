@@ -666,6 +666,10 @@ class ThemeManagerDialog(QDialog):
 # -----------------------------
 from binaryninjaui import UIAction, UIActionHandler, Menu
 
+# The parenthetical keeps the action findable by "theme" in the command palette
+# and says what it does, without needing a separate alias.
+ACTION_NAME = "Swatch (Theme Picker)"
+
 def open_manager(context):
     if theme_dir() is None:
         log_error(f"[Swatch] {NO_USER_DIR_MSG}")
@@ -674,6 +678,6 @@ def open_manager(context):
     dlg = ThemeManagerDialog()
     dlg.exec()
 
-UIAction.registerAction("Swatch")
-UIActionHandler.globalActions().bindAction("Swatch", UIAction(open_manager))
-Menu.mainMenu("Plugins").addAction("Swatch", "Themes")
+UIAction.registerAction(ACTION_NAME)
+UIActionHandler.globalActions().bindAction(ACTION_NAME, UIAction(open_manager))
+Menu.mainMenu("Plugins").addAction(ACTION_NAME, "Themes")

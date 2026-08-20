@@ -26,6 +26,7 @@ TEST_FILES = [
     "test_dialog.py",
     "test_theme_api.py",
     "test_builtin.py",
+    "test_action.py",
     "test_search.py",
     "test_browse.py",
     "test_threading.py",
