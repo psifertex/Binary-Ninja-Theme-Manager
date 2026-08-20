@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import requests
 
 from binaryninja import (
@@ -36,6 +37,11 @@ ISSUES_URL = "https://github.com/psifertex/Binary-Ninja-Theme-Manager/issues/new
 SESSION_REMOTE_CACHE = {}
 
 REMOTE_TEXT_CACHE = {}
+
+# A failed fetch is remembered too, so a search keystroke doesn't re-hit every
+# repo (and burn the 60/hr unauthenticated rate limit) while blocking the UI.
+FAILED_FETCH_TIMES = {}
+FETCH_RETRY_SECONDS = 60
 
 NO_USER_DIR_MSG = ("Binary Ninja's user directory could not be determined, so "
                    "there is nowhere to install themes.")
@@ -120,11 +126,17 @@ def fetch_repo_themes(owner, repo, path=""):
     if key in SESSION_REMOTE_CACHE:
         return SESSION_REMOTE_CACHE[key]
 
+    failed_at = FAILED_FETCH_TIMES.get(key)
+    if failed_at is not None and time.monotonic() - failed_at < FETCH_RETRY_SECONDS:
+        return []
+
     log_info(f"[ThemeManager] Fetching remote: {owner}/{repo}")
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
     try:
         r = requests.get(url, timeout=5)
         if r.status_code != 200:
+            log_error(f"[ThemeManager] {owner}/{repo} returned HTTP {r.status_code}")
+            FAILED_FETCH_TIMES[key] = time.monotonic()
             return []
         
         themes = []
@@ -133,9 +145,11 @@ def fetch_repo_themes(owner, repo, path=""):
                 themes.append({"name": f["name"], "download_url": f["download_url"]})
         
         SESSION_REMOTE_CACHE[key] = themes
+        FAILED_FETCH_TIMES.pop(key, None)
         return themes
     except Exception as e:
-        log_error(f"Fetch error: {e}")
+        log_error(f"[ThemeManager] Fetch error for {owner}/{repo}: {e}")
+        FAILED_FETCH_TIMES[key] = time.monotonic()
         return []
 
 def apply_theme(theme_filename):
