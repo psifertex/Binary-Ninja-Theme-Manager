@@ -68,6 +68,8 @@ def ensure_dirs():
 # -----------------------------
 # THEME UTILS
 # -----------------------------
+DISPLAY_NAME_CACHE = {}
+
 def get_theme_display_name(theme_filename):
     """Reads the JSON inside the .bntheme to get the actual UI name."""
     base = theme_dir()
@@ -77,8 +79,17 @@ def get_theme_display_name(theme_filename):
     if not os.path.exists(theme_path):
         return theme_filename
     try:
+        key = (theme_path, os.path.getmtime(theme_path))
+    except OSError:
+        key = None
+    if key is not None and key in DISPLAY_NAME_CACHE:
+        return DISPLAY_NAME_CACHE[key]
+    try:
         with open(theme_path, "r", encoding="utf-8") as f:
-            return json.load(f).get("name", theme_filename)
+            name = json.load(f).get("name", theme_filename)
+        if key is not None:
+            DISPLAY_NAME_CACHE[key] = name
+        return name
     except Exception as e:
         log_error(f"[ThemeManager] Could not read {theme_filename}: {e}")
         return theme_filename
@@ -198,6 +209,22 @@ def download_theme(theme_obj, callback):
 # Theme rows store metadata here; group headers carry none (how we distinguish them).
 THEME_ROLE = Qt.UserRole
 
+def _remote_display_name(theme_obj):
+    """Display name of a remote theme, only if it was already fetched."""
+    text = REMOTE_TEXT_CACHE.get(theme_obj["download_url"])
+    if text is None:
+        return None
+    try:
+        return json.loads(text).get("name")
+    except Exception:
+        return None
+
+def _matches(theme_obj, query):
+    if query in theme_obj["name"].lower():
+        return True
+    display = _remote_display_name(theme_obj)
+    return bool(display) and query in display.lower()
+
 def _make_group_item(text):
     """A collapsible, non-selectable section header (top-level tree node)."""
     item = QTreeWidgetItem([text])
@@ -307,7 +334,9 @@ class ThemeManagerDialog(QDialog):
         local_files = get_locally_installed_files()
 
         # 1. INSTALLED SECTION
-        installed = [f for f in local_files if search_query in f.lower()]
+        installed = [f for f in local_files
+                     if search_query in f.lower()
+                     or search_query in get_theme_display_name(f).lower()]
         if installed:
             grp = _make_group_item("INSTALLED LOCALLY")
             self.theme_list.addTopLevelItem(grp)
@@ -318,7 +347,7 @@ class ThemeManagerDialog(QDialog):
         for owner, repo, path in REPOS:
             themes = fetch_repo_themes(owner, repo, path)
             # Filter themes based on search
-            filtered = [t for t in themes if search_query in t["name"].lower()]
+            filtered = [t for t in themes if _matches(t, search_query)]
             if not filtered:
                 continue
             grp = _make_group_item(f"{owner} / {repo}")
