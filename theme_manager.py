@@ -162,7 +162,11 @@ def apply_theme(theme_filename):
         log_info(f"Applied: {display_name} (Restart required)")
         return
     # setActiveTheme saves to settings itself (saveToSettings defaults to true).
-    setActiveTheme(display_name)
+    try:
+        setActiveTheme(display_name)
+    except Exception as e:
+        log_error(f"[ThemeManager] Could not apply {display_name}: {e}")
+        return
     log_info(f"Applied: {display_name}")
 
 def download_theme(theme_obj, callback):
