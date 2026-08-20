@@ -79,7 +79,8 @@ def get_theme_display_name(theme_filename):
     try:
         with open(theme_path, "r", encoding="utf-8") as f:
             return json.load(f).get("name", theme_filename)
-    except:
+    except Exception as e:
+        log_error(f"[ThemeManager] Could not read {theme_filename}: {e}")
         return theme_filename
 
 def get_locally_installed_files():
