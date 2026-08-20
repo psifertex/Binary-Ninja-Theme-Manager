@@ -1,7 +1,9 @@
 import os
 _UD = os.environ.get("STUB_USER_DIR") or None
 def user_directory(): return _UD
+def log_debug(*a): print("DEBUG:", *a)
 def log_info(*a): print("INFO:", *a)
+def log_warn(*a): print("WARN:", *a)
 def log_error(*a): print("ERROR:", *a)
 _SETTINGS = {}
 _SCHEMAS = {}

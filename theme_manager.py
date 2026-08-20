@@ -4,7 +4,8 @@ import time
 import requests
 
 from binaryninja import (
-    Settings, log_info, log_error, user_directory, show_message_box
+    Settings, log_debug, log_info, log_warn, log_error, user_directory,
+    show_message_box
 )
 
 from PySide6.QtWidgets import (
@@ -138,7 +139,7 @@ def get_theme_display_name(theme_filename):
             DISPLAY_NAME_CACHE[key] = name
         return name
     except Exception as e:
-        log_error(f"[Swatch] Could not read {theme_filename}: {e}")
+        log_warn(f"[Swatch] Could not read {theme_filename}: {e}")
         return theme_filename
 
 def get_locally_installed_files():
@@ -157,7 +158,7 @@ def load_local_theme_json(theme_filename):
         with open(theme_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        log_error(f"[Swatch] Could not read {theme_filename}: {e}")
+        log_warn(f"[Swatch] Could not read {theme_filename}: {e}")
         return None
 
 def load_remote_theme_json(download_url):
@@ -168,12 +169,12 @@ def load_remote_theme_json(download_url):
             text = requests.get(download_url, timeout=5).text
             REMOTE_TEXT_CACHE[download_url] = text
         except Exception as e:
-            log_error(f"[Swatch] Preview fetch failed: {e}")
+            log_warn(f"[Swatch] Preview fetch failed: {e}")
             return None
     try:
         return json.loads(text)
     except Exception as e:
-        log_error(f"[Swatch] Could not parse remote theme: {e}")
+        log_warn(f"[Swatch] Could not parse remote theme: {e}")
         return None
 
 # -----------------------------
@@ -188,12 +189,12 @@ def fetch_repo_themes(owner, repo, path=""):
     if failed_at is not None and time.monotonic() - failed_at < FETCH_RETRY_SECONDS:
         return []
 
-    log_info(f"[Swatch] Fetching remote: {owner}/{repo}")
+    log_debug(f"[Swatch] Fetching remote: {owner}/{repo}")
     url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
     try:
         r = requests.get(url, timeout=5)
         if r.status_code != 200:
-            log_error(f"[Swatch] {owner}/{repo} returned HTTP {r.status_code}")
+            log_warn(f"[Swatch] {owner}/{repo} returned HTTP {r.status_code}")
             FAILED_FETCH_TIMES[key] = time.monotonic()
             return []
         
@@ -206,7 +207,7 @@ def fetch_repo_themes(owner, repo, path=""):
         FAILED_FETCH_TIMES.pop(key, None)
         return themes
     except Exception as e:
-        log_error(f"[Swatch] Fetch error for {owner}/{repo}: {e}")
+        log_warn(f"[Swatch] Fetch error for {owner}/{repo}: {e}")
         FAILED_FETCH_TIMES[key] = time.monotonic()
         return []
 
@@ -220,7 +221,7 @@ def apply_theme_name(display_name):
     except Exception:
         # No UI bindings available; persist the choice for the next launch.
         Settings().set_string("ui.theme.name", display_name)
-        log_info(f"Applied: {display_name} (Restart required)")
+        log_warn(f"[Swatch] Applied: {display_name} (Restart required)")
         return
     # setActiveTheme saves to settings itself (saveToSettings defaults to true).
     try:
@@ -228,7 +229,7 @@ def apply_theme_name(display_name):
     except Exception as e:
         log_error(f"[Swatch] Could not apply {display_name}: {e}")
         return
-    log_info(f"Applied: {display_name}")
+    log_info(f"[Swatch] Applied: {display_name}")
 
 # BN compiles its default themes in as Qt resources under this prefix and loads
 # them with QDir(":/themes") itself, so we can read the same .bntheme JSON.
@@ -246,7 +247,7 @@ def _read_builtin_themes():
         try:
             data = json.loads(bytes(f.readAll()).decode("utf-8"))
         except Exception as e:
-            log_error(f"[Swatch] Could not parse {info.fileName()}: {e}")
+            log_warn(f"[Swatch] Could not parse {info.fileName()}: {e}")
             continue
         finally:
             f.close()
@@ -262,7 +263,7 @@ def builtin_theme_json(name):
         try:
             _BUILTIN_THEME_DATA = _read_builtin_themes()
         except Exception as e:
-            log_error(f"[Swatch] Could not read bundled themes: {e}")
+            log_warn(f"[Swatch] Could not read bundled themes: {e}")
             _BUILTIN_THEME_DATA = {}
     return _BUILTIN_THEME_DATA.get(name)
 
@@ -276,7 +277,7 @@ def get_builtin_themes():
         from binaryninjaui import getAvailableThemes
         available = [str(t) for t in getAvailableThemes()]
     except Exception as e:
-        log_error(f"[Swatch] Could not list built-in themes: {e}")
+        log_debug(f"[Swatch] Could not list built-in themes: {e}")
         return []
     installed = {get_theme_display_name(f) for f in get_locally_installed_files()}
     return [t for t in available if t not in installed]
